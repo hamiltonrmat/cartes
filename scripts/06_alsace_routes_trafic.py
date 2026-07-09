@@ -249,22 +249,39 @@ def build_ui_panel(tomtom_key, mask_geojson):
   function addTrafficLayer() {{
     const map = deckInstance.getMapboxMap();
     if (!map || map.getSource(TRAFFIC_SOURCE_ID)) return;
+
+    // On insère trafic + masque juste EN DESSOUS du premier calque de
+    // libellés (noms de lieux, symboles) du style CARTO, plutôt qu'au sommet
+    // de toute la pile : ainsi le trafic colore les routes mais reste sous
+    // les libellés, et surtout le masque ne cache que le trafic — pas les
+    // routes/libellés du fond de carte, qui restent visibles partout.
+    let beforeId;
+    try {{
+      const firstLabelLayer = map.getStyle().layers.find((l) => l.type === "symbol");
+      beforeId = firstLabelLayer ? firstLabelLayer.id : undefined;
+    }} catch (e) {{
+      beforeId = undefined;
+    }}
+
     map.addSource(TRAFFIC_SOURCE_ID, {{
       type: "raster",
       tiles: ["{traffic_tile_url}"],
       tileSize: 256,
     }});
-    map.addLayer({{
-      id: TRAFFIC_LAYER_ID,
-      type: "raster",
-      source: TRAFFIC_SOURCE_ID,
-      paint: {{"raster-opacity": 0.8}},
-    }});
+    map.addLayer(
+      {{
+        id: TRAFFIC_LAYER_ID,
+        type: "raster",
+        source: TRAFFIC_SOURCE_ID,
+        paint: {{"raster-opacity": 0.8}},
+      }},
+      beforeId
+    );
 
     // Masque : cache le trafic partout SAUF à l'intérieur du contour exact
     // des 2 départements (le polygone a une grande enveloppe et les
-    // départements en "trous"). Ajouté juste après, donc juste au-dessus,
-    // de la couche trafic — le reste du fond de carte n'est pas affecté.
+    // départements en "trous"), inséré juste au-dessus du trafic (même
+    // beforeId, ajouté juste après) et toujours sous les libellés.
     let maskColor = "#fafaf8";
     try {{
       maskColor = map.getPaintProperty("background", "background-color") || maskColor;
@@ -272,12 +289,15 @@ def build_ui_panel(tomtom_key, mask_geojson):
       /* style sans couche "background" : on garde la couleur par défaut */
     }}
     map.addSource(MASK_SOURCE_ID, {{type: "geojson", data: ALSACE_MASK_GEOJSON}});
-    map.addLayer({{
-      id: MASK_LAYER_ID,
-      type: "fill",
-      source: MASK_SOURCE_ID,
-      paint: {{"fill-color": maskColor, "fill-opacity": 1}},
-    }});
+    map.addLayer(
+      {{
+        id: MASK_LAYER_ID,
+        type: "fill",
+        source: MASK_SOURCE_ID,
+        paint: {{"fill-color": maskColor, "fill-opacity": 1}},
+      }},
+      beforeId
+    );
   }}
 
   function initTraffic() {{
