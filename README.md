@@ -21,6 +21,7 @@ Chaque script génère un fichier HTML autonome dans `output/`, à ouvrir direct
 | `scripts/04_arbres_strasbourg.py` | `ScatterplotLayer` | Patrimoine arboré réel de Strasbourg (open data), 3 couches (petit/moyen/grand) à afficher/masquer, légende |
 | `scripts/05_pistes_cyclables_strasbourg.py` | `GeoJsonLayer` | Réseau cyclable réel de Strasbourg, une couche par type d'aménagement, légende avec compteurs |
 | `scripts/06_alsace_routes_trafic.py` | `GeoJsonLayer` + `TileLayer` | Contours Bas-Rhin/Haut-Rhin, autoroutes/routes nationales, trafic routier temps réel (TomTom) |
+| `scripts/07_carte_complete.py` | tout ce qui précède | **Carte unique** combinant toutes les couches ci-dessus (départements, villes, arbres, pistes cyclables, routes, trafic), données locales |
 
 ```bash
 python scripts/01_scatter_villes.py
@@ -29,6 +30,7 @@ python scripts/03_arc_connections.py
 python scripts/04_arbres_strasbourg.py
 python scripts/05_pistes_cyclables_strasbourg.py
 python scripts/06_alsace_routes_trafic.py
+python scripts/07_carte_complete.py
 ```
 
 Les scripts `04` et `05` ont besoin d'une connexion internet pour télécharger les données
@@ -44,31 +46,40 @@ chaque case cochée/décochée.
 
 ## Données
 
-- `data/alsace_villes.csv` : une petite liste de villes d'Alsace (Bas-Rhin / Haut-Rhin)
-  avec leurs coordonnées et population, à utiliser comme point de départ pour d'autres
-  visualisations (choroplèthes, trajets, etc.).
-- **Open data réelle utilisée par les scripts 04/05**, via
-  [data.strasbourg.eu](https://data.strasbourg.eu) (portail OpenDataSoft de l'Eurométropole
-  de Strasbourg) — jeux de données `patrimoine_arbore` (arbres) et `amg_cycl_bnac`
-  (aménagements cyclables, format BNAC), interrogés via l'API v2.1
-  (`/api/explore/v2.1/catalog/datasets/<dataset>/exports/geojson`).
-- **Données utilisées par le script 06** :
-  - Contours des départements : [gregoiredavid/france-geojson](https://github.com/gregoiredavid/france-geojson)
-    (dérivé de données IGN, licence ouverte).
-  - Réseau routier (autoroutes/routes nationales) : [OpenStreetMap](https://www.openstreetmap.org/)
-    via l'API [Overpass](https://overpass-api.de/), requêté en direct sur l'emprise de l'Alsace.
-  - Trafic routier temps réel : [TomTom Traffic API](https://developer.tomtom.com/) (tuiles
-    "Raster Flow"), nécessite une clé API gratuite — voir ci-dessous.
+Les données géographiques sont **téléchargées une fois puis versionnées dans `data/`**
+(sauf le trafic temps réel, qui n'a de sens qu'en direct). Ça évite de dépendre à chaque
+lancement de la disponibilité d'APIs externes — Overpass (OpenStreetMap) en particulier
+peut être lent ou temporairement saturé.
 
-## Configurer la clé TomTom (script 06)
+```bash
+python scripts/download_data.py
+```
+
+À relancer de temps en temps pour rafraîchir les données (elles évoluent lentement), puis
+recommitez les fichiers modifiés dans `data/`.
+
+| Fichier | Source | Contenu |
+|---|---|---|
+| `data/alsace_villes.csv` | saisie manuelle | Villes d'Alsace, coordonnées + population |
+| `data/departements.geojson` | [france-geojson](https://github.com/gregoiredavid/france-geojson) (dérivé IGN) | Contours Bas-Rhin (67) / Haut-Rhin (68) |
+| `data/arbres_strasbourg.geojson` | [data.strasbourg.eu](https://data.strasbourg.eu) (`patrimoine_arbore`) | Patrimoine arboré autour du centre-ville |
+| `data/pistes_cyclables_strasbourg.geojson` | [data.strasbourg.eu](https://data.strasbourg.eu) (`amg_cycl_bnac`, format BNAC) | Réseau cyclable autour du centre-ville |
+| `data/routes_alsace.geojson` | [OpenStreetMap](https://www.openstreetmap.org/) via [Overpass](https://overpass-api.de/) | Autoroutes et routes nationales/express |
+
+Le **trafic routier temps réel** (scripts 06 et 07) vient du
+[TomTom Traffic API](https://developer.tomtom.com/) (tuiles "Raster Flow") et reste chargé
+en direct par le navigateur — nécessite une clé API gratuite, voir ci-dessous.
+
+## Configurer la clé TomTom (scripts 06 et 07)
 
 1. Créez une clé gratuite sur [developer.tomtom.com](https://developer.tomtom.com/).
 2. Copiez `.env.example` en `.env` à la racine du projet.
 3. Renseignez `TOMTOM_API_KEY=votre_cle` dans ce fichier `.env`.
 
 `.env` est ignoré par git (voir `.gitignore`) : la clé reste uniquement sur votre machine et
-n'est jamais commitée. Le script la charge via `python-dotenv` et s'arrête avec un message
-clair si elle est absente.
+n'est jamais commitée. Les scripts la chargent via `python-dotenv`. Le script 06 s'arrête
+avec un message clair si la clé est absente ; le script 07 génère la carte sans la couche
+trafic dans ce cas (toutes les autres couches restent disponibles).
 
 ## Pour aller plus loin
 
