@@ -20,6 +20,7 @@ Chaque script génère un fichier HTML autonome dans `output/`, à ouvrir direct
 | `scripts/03_arc_connections.py` | `ArcLayer` | Arcs reliant Strasbourg aux autres villes, épaisseur selon la population |
 | `scripts/04_arbres_strasbourg.py` | `ScatterplotLayer` | Patrimoine arboré réel de Strasbourg (open data), 3 couches (petit/moyen/grand) à afficher/masquer, légende |
 | `scripts/05_pistes_cyclables_strasbourg.py` | `GeoJsonLayer` | Réseau cyclable réel de Strasbourg, une couche par type d'aménagement, légende avec compteurs |
+| `scripts/06_alsace_routes_trafic.py` | `GeoJsonLayer` + `TileLayer` | Contours Bas-Rhin/Haut-Rhin, autoroutes/routes nationales, trafic routier temps réel (TomTom) |
 
 ```bash
 python scripts/01_scatter_villes.py
@@ -27,6 +28,7 @@ python scripts/02_hexagon_density.py
 python scripts/03_arc_connections.py
 python scripts/04_arbres_strasbourg.py
 python scripts/05_pistes_cyclables_strasbourg.py
+python scripts/06_alsace_routes_trafic.py
 ```
 
 Les scripts `04` et `05` ont besoin d'une connexion internet pour télécharger les données
@@ -50,13 +52,33 @@ chaque case cochée/décochée.
   de Strasbourg) — jeux de données `patrimoine_arbore` (arbres) et `amg_cycl_bnac`
   (aménagements cyclables, format BNAC), interrogés via l'API v2.1
   (`/api/explore/v2.1/catalog/datasets/<dataset>/exports/geojson`).
+- **Données utilisées par le script 06** :
+  - Contours des départements : [gregoiredavid/france-geojson](https://github.com/gregoiredavid/france-geojson)
+    (dérivé de données IGN, licence ouverte).
+  - Réseau routier (autoroutes/routes nationales) : [OpenStreetMap](https://www.openstreetmap.org/)
+    via l'API [Overpass](https://overpass-api.de/), requêté en direct sur l'emprise de l'Alsace.
+  - Trafic routier temps réel : [TomTom Traffic API](https://developer.tomtom.com/) (tuiles
+    "Raster Flow"), nécessite une clé API gratuite — voir ci-dessous.
+
+## Configurer la clé TomTom (script 06)
+
+1. Créez une clé gratuite sur [developer.tomtom.com](https://developer.tomtom.com/).
+2. Copiez `.env.example` en `.env` à la racine du projet.
+3. Renseignez `TOMTOM_API_KEY=votre_cle` dans ce fichier `.env`.
+
+`.env` est ignoré par git (voir `.gitignore`) : la clé reste uniquement sur votre machine et
+n'est jamais commitée. Le script la charge via `python-dotenv` et s'arrête avec un message
+clair si elle est absente.
 
 ## Pour aller plus loin
 
 - Essayer d'autres jeux de données du même portail : qualité de l'air, parkings,
-  trafic temps réel (SIRAC), réseau CTS (GTFS)...
-- Étendre le principe à toute l'Alsace avec les contours de communes
+  réseau CTS (GTFS)...
+- Étendre le principe des scripts 04/05 à toute l'Alsace avec les contours de communes
   (data.gouv.fr / data.grandest.fr) pour une couche choroplèthe `GeoJsonLayer`.
+- Élargir le script 06 aux routes départementales/primaires (attention, volumétrie
+  nettement plus importante sur Overpass) ou à d'autres styles de tuiles TomTom
+  (`absolute`, `relative-delay`).
 - Un fond de carte IGN (Géoplateforme) est possible via une `TileLayer` pydeck, mais son URL
   doit se terminer par une extension d'image reconnaissable (ex : le flux "TMS" en
   `/{z}/{x}/{y}.png`) pour que deck.gl charge correctement les tuiles — un flux WMTS classique
