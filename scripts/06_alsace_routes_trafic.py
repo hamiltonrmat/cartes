@@ -16,6 +16,7 @@ TOMTOM_API_KEY=votre_cle. Le fichier ".env" est ignoré par git : la clé
 ne doit jamais être commitée.
 """
 
+import json
 import os
 import sys
 
@@ -85,6 +86,36 @@ def fetch_departements():
     return {"type": "FeatureCollection", "features": features}
 
 
+# Grande enveloppe (Europe de l'Ouest) dans laquelle les départements sont
+# "découpés" en trous : ce polygone sert de masque pour ne montrer le trafic
+# TomTom qu'à l'intérieur du contour exact de l'Alsace (voir build_ui_panel).
+MASK_OUTER_RING = [[-20, 30], [30, 30], [30, 70], [-20, 70], [-20, 30]]
+
+
+def build_mask_geojson(departements_geojson):
+    holes = []
+    for feature in departements_geojson["features"]:
+        geom = feature["geometry"]
+        if geom["type"] == "Polygon":
+            holes.append(geom["coordinates"][0])
+        elif geom["type"] == "MultiPolygon":
+            for polygon in geom["coordinates"]:
+                holes.append(polygon[0])
+    return {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "properties": {},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [MASK_OUTER_RING] + holes,
+                },
+            }
+        ],
+    }
+
+
 def fetch_routes():
     print("Téléchargement des autoroutes / routes nationales via OpenStreetMap (Overpass)...")
     # Overpass renvoie 406 sans User-Agent explicite (le UA par défaut de `requests` est rejeté).
@@ -151,7 +182,7 @@ def build_layers(departements_geojson, routes_by_type):
     return layers
 
 
-def build_ui_panel(tomtom_key):
+def build_ui_panel(tomtom_key, mask_geojson):
     legend_rows = [
         ("departements", "Contour des départements", [60, 60, 60, 220], "line"),
         ("routes-motorway", ROAD_LABELS["motorway"], ROAD_COLORS["motorway"], "line"),
@@ -178,6 +209,7 @@ def build_ui_panel(tomtom_key):
         "https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png"
         f"?key={tomtom_key}"
     )
+    mask_geojson_json = json.dumps(mask_geojson)
 
     return f"""
 <div id="ui-panel">
@@ -210,6 +242,9 @@ def build_ui_panel(tomtom_key):
 <script>
   const TRAFFIC_SOURCE_ID = "tomtom-traffic-source";
   const TRAFFIC_LAYER_ID = "trafic-tomtom";
+  const MASK_SOURCE_ID = "alsace-mask-source";
+  const MASK_LAYER_ID = "alsace-mask-layer";
+  const ALSACE_MASK_GEOJSON = {mask_geojson_json};
 
   function addTrafficLayer() {{
     const map = deckInstance.getMapboxMap();
@@ -224,6 +259,24 @@ def build_ui_panel(tomtom_key):
       type: "raster",
       source: TRAFFIC_SOURCE_ID,
       paint: {{"raster-opacity": 0.8}},
+    }});
+
+    // Masque : cache le trafic partout SAUF à l'intérieur du contour exact
+    // des 2 départements (le polygone a une grande enveloppe et les
+    // départements en "trous"). Ajouté juste après, donc juste au-dessus,
+    // de la couche trafic — le reste du fond de carte n'est pas affecté.
+    let maskColor = "#fafaf8";
+    try {{
+      maskColor = map.getPaintProperty("background", "background-color") || maskColor;
+    }} catch (e) {{
+      /* style sans couche "background" : on garde la couleur par défaut */
+    }}
+    map.addSource(MASK_SOURCE_ID, {{type: "geojson", data: ALSACE_MASK_GEOJSON}});
+    map.addLayer({{
+      id: MASK_LAYER_ID,
+      type: "fill",
+      source: MASK_SOURCE_ID,
+      paint: {{"fill-color": maskColor, "fill-opacity": 1}},
     }});
   }}
 
@@ -257,8 +310,12 @@ def build_ui_panel(tomtom_key):
 
     if (layerId === TRAFFIC_LAYER_ID) {{
       const map = deckInstance.getMapboxMap();
+      const vis = visible ? "visible" : "none";
       if (map && map.getLayer(TRAFFIC_LAYER_ID)) {{
-        map.setLayoutProperty(TRAFFIC_LAYER_ID, "visibility", visible ? "visible" : "none");
+        map.setLayoutProperty(TRAFFIC_LAYER_ID, "visibility", vis);
+      }}
+      if (map && map.getLayer(MASK_LAYER_ID)) {{
+        map.setLayoutProperty(MASK_LAYER_ID, "visibility", vis);
       }}
       return;
     }}
@@ -293,8 +350,10 @@ def main():
         tooltip={"text": "{label}"},
     )
 
+    mask_geojson = build_mask_geojson(departements_geojson)
+
     html_str = deck.to_html(as_string=True, notebook_display=False)
-    html_str = inject_before_closing_body(html_str, build_ui_panel(tomtom_key))
+    html_str = inject_before_closing_body(html_str, build_ui_panel(tomtom_key, mask_geojson))
 
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         f.write(html_str)
