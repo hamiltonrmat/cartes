@@ -6,11 +6,17 @@ et la couleur dépendent de la population. C'est le "hello world" de pydeck :
 un DataFrame + une Layer + une View.
 """
 
+import os
+
 import pandas as pd
 import pydeck as pdk
 
-CSV_PATH = "data/alsace_villes.csv"
-OUTPUT_PATH = "output/01_scatter_villes.html"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(SCRIPT_DIR)
+CSV_PATH = os.path.join(BASE_DIR, "data", "alsace_villes.csv")
+OUTPUT_PATH = os.path.join(BASE_DIR, "output", "01_scatter_villes.html")
+
+os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 
 df = pd.read_csv(CSV_PATH)
 

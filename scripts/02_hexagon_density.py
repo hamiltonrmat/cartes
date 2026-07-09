@@ -6,12 +6,18 @@ leur population) puis les agrège en colonnes hexagonales 3D. Utile pour
 visualiser une densité (ex : commerces, capteurs, incidents...).
 """
 
+import os
+
 import numpy as np
 import pandas as pd
 import pydeck as pdk
 
-CSV_PATH = "data/alsace_villes.csv"
-OUTPUT_PATH = "output/02_hexagon_density.html"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(SCRIPT_DIR)
+CSV_PATH = os.path.join(BASE_DIR, "data", "alsace_villes.csv")
+OUTPUT_PATH = os.path.join(BASE_DIR, "output", "02_hexagon_density.html")
+
+os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 
 villes = pd.read_csv(CSV_PATH)
 

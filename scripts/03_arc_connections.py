@@ -6,11 +6,17 @@ d'Alsace, avec une épaisseur proportionnelle à la population. Utile pour
 visualiser des flux (migrations, trajets, échanges commerciaux...).
 """
 
+import os
+
 import pandas as pd
 import pydeck as pdk
 
-CSV_PATH = "data/alsace_villes.csv"
-OUTPUT_PATH = "output/03_arc_connections.html"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(SCRIPT_DIR)
+CSV_PATH = os.path.join(BASE_DIR, "data", "alsace_villes.csv")
+OUTPUT_PATH = os.path.join(BASE_DIR, "output", "03_arc_connections.html")
+
+os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 
 df = pd.read_csv(CSV_PATH)
 
