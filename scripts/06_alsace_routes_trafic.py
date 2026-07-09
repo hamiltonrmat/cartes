@@ -227,16 +227,29 @@ def build_ui_panel(tomtom_key):
     }});
   }}
 
-  (function initTraffic() {{
-    const map = deckInstance.getMapboxMap();
-    if (map && map.loaded && map.loaded()) {{
-      addTrafficLayer();
-    }} else if (map) {{
-      map.on("load", addTrafficLayer);
-    }} else {{
-      setTimeout(initTraffic, 200);
+  function initTraffic() {{
+    // "deckInstance" est déclaré dans un <script> placé APRÈS celui-ci
+    // (après le </body>, généré par pydeck) : tant qu'il n'existe pas
+    // encore, un accès direct lèverait une ReferenceError qui arrêterait
+    // silencieusement ce script. On sonde donc avec "typeof" (sans risque
+    // d'erreur) jusqu'à ce que deckInstance soit prêt.
+    if (typeof deckInstance === "undefined" || !deckInstance || !deckInstance.getMapboxMap) {{
+      setTimeout(initTraffic, 100);
+      return;
     }}
-  }})();
+    const map = deckInstance.getMapboxMap();
+    if (!map) {{
+      setTimeout(initTraffic, 100);
+      return;
+    }}
+    if (map.loaded && map.loaded()) {{
+      addTrafficLayer();
+    }} else {{
+      map.on("load", addTrafficLayer);
+    }}
+  }}
+
+  initTraffic();
 
   function toggleLayer(checkbox) {{
     const layerId = checkbox.dataset.layerId;
