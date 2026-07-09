@@ -30,13 +30,14 @@ BASE_DIR = os.path.dirname(SCRIPT_DIR)
 OUTPUT_PATH = os.path.join(BASE_DIR, "output", "04_arbres_ign_strasbourg.html")
 os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 
-# Fond de carte IGN (Géoplateforme), pas de clé nécessaire
+# Fond de carte IGN (Géoplateforme), pas de clé nécessaire.
+# On utilise la variante "TMS" (URL en /{z}/{x}/{y}.png) plutôt que le WMTS à
+# paramètres KVP : deck.gl détecte le format d'image via l'extension de
+# l'URL, qu'un GetTile WMTS classique (sans extension) ne fournit pas —
+# les tuiles ne s'affichaient pas silencieusement avec cette dernière.
 IGN_TILE_URL = (
-    "https://data.geopf.fr/wmts?"
-    "SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile"
-    "&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal"
-    "&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}"
-    "&FORMAT=image/png"
+    "https://data.geopf.fr/tms/1.0.0/"
+    "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2/{z}/{x}/{y}.png"
 )
 
 

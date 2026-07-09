@@ -27,12 +27,12 @@ BASE_DIR = os.path.dirname(SCRIPT_DIR)
 OUTPUT_PATH = os.path.join(BASE_DIR, "output", "05_pistes_cyclables_ign.html")
 os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 
+# Variante "TMS" (URL en /{z}/{x}/{y}.png) : deck.gl détecte le format
+# d'image via l'extension de l'URL, absente d'un GetTile WMTS classique
+# à paramètres KVP, ce qui faisait échouer silencieusement l'affichage.
 IGN_TILE_URL = (
-    "https://data.geopf.fr/wmts?"
-    "SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile"
-    "&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal"
-    "&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}"
-    "&FORMAT=image/png"
+    "https://data.geopf.fr/tms/1.0.0/"
+    "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2/{z}/{x}/{y}.png"
 )
 
 # Couleur par type d'aménagement (champ BNAC "ame_d" : aménagement côté droit)
