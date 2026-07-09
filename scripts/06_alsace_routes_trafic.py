@@ -118,7 +118,7 @@ def fetch_routes():
     return by_type
 
 
-def build_layers(departements_geojson, routes_by_type, tomtom_key):
+def build_layers(departements_geojson, routes_by_type):
     layers = [
         pdk.Layer(
             "GeoJsonLayer",
@@ -148,26 +148,10 @@ def build_layers(departements_geojson, routes_by_type, tomtom_key):
             )
         )
 
-    traffic_tile_url = (
-        "https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png"
-        f"?key={tomtom_key}"
-    )
-    layers.append(
-        pdk.Layer(
-            "TileLayer",
-            id="trafic-tomtom",
-            data=traffic_tile_url,
-            min_zoom=0,
-            max_zoom=19,
-            tile_size=256,
-            opacity=0.8,
-            visible=True,
-        )
-    )
     return layers
 
 
-def build_ui_panel():
+def build_ui_panel(tomtom_key):
     legend_rows = [
         ("departements", "Contour des départements", [60, 60, 60, 220], "line"),
         ("routes-motorway", ROAD_LABELS["motorway"], ROAD_COLORS["motorway"], "line"),
@@ -183,6 +167,16 @@ def build_ui_panel():
           {label}
         </label>"""
         for layer_id, label, color, shape in legend_rows
+    )
+
+    # Tuiles TomTom Traffic Flow. On les branche directement sur l'instance
+    # MapLibre sous-jacente (deckInstance.getMapboxMap()) plutôt que sur une
+    # TileLayer deck.gl : c'est le même moteur, éprouvé, qui affiche déjà le
+    # fond de carte CARTO, alors que la TileLayer deck.gl échouait
+    # silencieusement à charger les tuiles (cf. essais précédents avec l'IGN).
+    traffic_tile_url = (
+        "https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png"
+        f"?key={tomtom_key}"
     )
 
     return f"""
@@ -214,9 +208,48 @@ def build_ui_panel():
   #ui-panel .ui-swatch-block {{ height: 10px; border-radius: 2px; }}
 </style>
 <script>
+  const TRAFFIC_SOURCE_ID = "tomtom-traffic-source";
+  const TRAFFIC_LAYER_ID = "trafic-tomtom";
+
+  function addTrafficLayer() {{
+    const map = deckInstance.getMapboxMap();
+    if (!map || map.getSource(TRAFFIC_SOURCE_ID)) return;
+    map.addSource(TRAFFIC_SOURCE_ID, {{
+      type: "raster",
+      tiles: ["{traffic_tile_url}"],
+      tileSize: 256,
+    }});
+    map.addLayer({{
+      id: TRAFFIC_LAYER_ID,
+      type: "raster",
+      source: TRAFFIC_SOURCE_ID,
+      paint: {{"raster-opacity": 0.8}},
+    }});
+  }}
+
+  (function initTraffic() {{
+    const map = deckInstance.getMapboxMap();
+    if (map && map.loaded && map.loaded()) {{
+      addTrafficLayer();
+    }} else if (map) {{
+      map.on("load", addTrafficLayer);
+    }} else {{
+      setTimeout(initTraffic, 200);
+    }}
+  }})();
+
   function toggleLayer(checkbox) {{
     const layerId = checkbox.dataset.layerId;
     const visible = checkbox.checked;
+
+    if (layerId === TRAFFIC_LAYER_ID) {{
+      const map = deckInstance.getMapboxMap();
+      if (map && map.getLayer(TRAFFIC_LAYER_ID)) {{
+        map.setLayoutProperty(TRAFFIC_LAYER_ID, "visibility", visible ? "visible" : "none");
+      }}
+      return;
+    }}
+
     const newLayers = deckInstance.props.layers.map(
       (l) => (l.id === layerId ? l.clone({{visible}}) : l)
     );
@@ -231,7 +264,7 @@ def main():
     departements_geojson = fetch_departements()
     routes_by_type = fetch_routes()
 
-    layers = build_layers(departements_geojson, routes_by_type, tomtom_key)
+    layers = build_layers(departements_geojson, routes_by_type)
 
     view_state = pdk.ViewState(
         latitude=CENTER_LAT,
@@ -248,7 +281,7 @@ def main():
     )
 
     html_str = deck.to_html(as_string=True, notebook_display=False)
-    html_str = inject_before_closing_body(html_str, build_ui_panel())
+    html_str = inject_before_closing_body(html_str, build_ui_panel(tomtom_key))
 
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         f.write(html_str)
